@@ -192,13 +192,86 @@ def hero():
                "\n".join(css), body)
 
 
+# ---------------------------------------------------------------- origin story
+# Why: the Matrix, then Agent Smith boots.
+def origin():
+    W, H, CYCLE, X = 880, 500, 18, 40
+    rain_css, rain_g = rain(W, H, seed=3, opacity=0.5)
+    css = [rain_css,
+           ".bar{transform-box:fill-box;transform-origin:left center}"
+           ".cur{animation:blink 1s step-end infinite}@keyframes blink{50%{opacity:0}}"]
+
+    def appear(cls, at):
+        css.append(f".{cls}{{animation:{cls} {CYCLE}s step-end infinite}}"
+                   f"@keyframes {cls}{{0%{{opacity:0}}{at:.2f}%{{opacity:1}}97%{{opacity:0}}}}")
+
+    typed_lines = [  # (cls, y, size, text, start%, end%)
+        ("t1", 70, 24, "Wake up, Devansh...", 2, 8),
+        ("t2", 104, 18, "You watched The Matrix and never got over it.", 10, 17),
+        ("t3", 132, 18, "You had no idea how hard it is to build one.", 19, 26),
+        ("t4", 160, 18, "You started anyway.", 28, 31),
+    ]
+    typed = []
+    for cls, y, size, text, a, b in typed_lines:
+        css.append(f".{cls}{{transform-box:fill-box;transform-origin:left center;animation:{cls} {CYCLE}s steps(36,end) infinite}}"
+                   f"@keyframes {cls}{{0%,{a}%{{transform:scaleX(0)}}{b}%,97%{{transform:scaleX(1)}}100%{{transform:scaleX(0)}}}}")
+        typed.append(f'<mask id="m{cls}"><rect class="{cls}" x="{X-4}" y="{y-size-4}" width="800" height="{size+12}" fill="#fff"/></mask>'
+                     f'<text x="{X}" y="{y}" class="m g" font-size="{size}" filter="url(#glow)" mask="url(#m{cls})">{esc(text)}</text>')
+
+    # boot log: (status, label, value, appear%)
+    boot = [
+        ("ok", "loading perspective", "different", 40),
+        ("ok", "loading will_of_fire", None, 45),          # value is a filling bar
+        ("ok", "scanning problems", "every one has a solution", 56),
+        ("ok", "spawning agents", "supplier_update, po_tracker, copilot", 61),
+        ("..", "mission: save the world", "in progress", 66),
+    ]
+    appear("cmd", 35)
+    rows, y = [], 238
+    for i, (status, label, value, at) in enumerate(boot):
+        cls = f"b{i}"
+        appear(cls, at)
+        scol = "g" if status == "ok" else "w"
+        val = ""
+        if value is None:
+            css.append(f"#fire{{animation:fire {CYCLE}s linear infinite}}"
+                       f"@keyframes fire{{0%,{at}%{{transform:scaleX(0)}}{at+8}%,97%{{transform:scaleX(1)}}100%{{transform:scaleX(0)}}}}")
+            appear("firepct", at + 8)
+            val = (f'<rect x="{X+430}" y="{y-11}" width="260" height="12" fill="none" stroke="{G3}"/>'
+                   f'<rect id="fire" class="bar" x="{X+430}" y="{y-11}" width="260" height="12" fill="{G}" filter="url(#glow)"/>'
+                   f'<text x="{X+700}" y="{y}" class="w firepct">100%</text>')
+        else:
+            val = f'<text x="{X+430}" y="{y}" class="{"w" if status == ".." else "g2"}">{esc(value)}</text>'
+        rows.append(f'<g class="{cls}"><text x="{X}" y="{y}" class="{scol}">[{status:^4}]</text>'
+                    f'<text x="{X+70}" y="{y}" class="g">{esc(label)}</text>'
+                    f'<path d="M{X+70 + 8.4*len(label) + 10:.0f} {y-4} H{X+418}" stroke="{G3}" stroke-dasharray="1 5"/>'
+                    f'{val}</g>')
+        y += 26
+    appear("q1", 76)
+    appear("q2", 82)
+
+    body = f"""{frame(W, H)}
+{rain_g}
+<rect x="24" y="24" width="{W-48}" height="{H-48}" rx="8" fill="{BG}" fill-opacity="0.5"/>
+{"".join(typed)}
+<g class="m" font-size="14">
+  <text x="{X}" y="204" class="cmd w">$ ./agent_smith --mission "save the world"</text>
+  {"".join(rows)}
+  <text x="{X}" y="420" class="q1 g" font-size="18" filter="url(#glow)">&gt; Every problem has a solution.</text>
+  <text x="{X}" y="452" class="q2 g" font-size="18" filter="url(#glow)">&gt; All it takes is a different perspective and the will of fire.<tspan class="cur"> &#9608;</tspan></text>
+</g>
+{overlays(W, H)}"""
+    return svg(W, H, "Wake up, Devansh. You watched The Matrix and never got over it. You had no idea how hard it is to build one. You started anyway. Agent Smith boots with the mission: save the world. Every problem has a solution. All it takes is a different perspective and the will of fire.",
+               "\n".join(css), body)
+
+
 # ---------------------------------------------------------------- neofetch card
 def fmt_int(n):
     return f"{n:,}" if isinstance(n, int) else "-"
 
 
 def card(stats):
-    W, H = 880, 360
+    W, H = 880, 340
     rain_css, rain_g = rain(260, H, cols_step=20, seed=11, opacity=0.45, id_prefix="n")
     D = ["11110", "10001", "10001", "10001", "10001", "10001", "11110"]
     C = ["01111", "10000", "10000", "10000", "10000", "10000", "01111"]
@@ -207,13 +280,13 @@ def card(stats):
           for y, row in enumerate(g)
           for x, c in enumerate(row) if c == "1"]
     rows = [
-        ("Role", "AI Architect & Eng Manager @ QAD"),
-        ("Before", "Head of AI @ Kavida (acquired by QAD)"),
+        ("Mission", "build intelligent machines that help"),
+        ("Origin", "The Matrix, as a teenager"),
+        ("Believes", "every problem has a solution"),
+        ("Fuel", "a different perspective + the will of fire"),
+        ("Days", "AI agents for real operations @ QAD"),
+        ("Nights", "Rust dev tools, offline-first remotes"),
         ("Based", "Hyderabad, India"),
-        ("Builds", "multi-agent platforms, document AI, evals"),
-        ("Agents", "A2A, MCP, LangGraph, LiteLLM, Temporal"),
-        ("Models", "OpenAI, Claude, Gemini, Bedrock"),
-        ("Stack", "Python, FastAPI, TypeScript, AWS, K8s"),
         None,
         ("Repos", fmt_int(stats.get("public_repos"))),
         ("Contribs", f"{fmt_int(stats.get('contributions'))} in the last year"),
@@ -233,93 +306,13 @@ def card(stats):
 <g transform="translate(64 108)" fill="{G}" filter="url(#glow)">{"".join(px)}</g>
 <path d="M280 20 V{H-20}" stroke="{G3}"/>
 <g class="m" font-size="14">
-  <text x="{kx}" y="44" class="w">devansh@mainframe:~$ <tspan class="g">neofetch</tspan></text>
+  <text x="{kx}" y="44" class="w">devansh@zion:~$ <tspan class="g">neofetch</tspan></text>
   <text x="{kx}" y="64" class="g3">{"-" * 50}</text>
   {"".join(lines)}
-  <text x="{kx}" y="{H-16}" class="g3" font-size="12">github stats refreshed daily</text>
 </g>
 {overlays(W, H)}"""
-    return svg(W, H, "Devansh Choubey: AI Architect and Engineering Manager at QAD, previously Head of AI at Kavida. Based in Hyderabad. Builds multi-agent platforms, document AI and evaluation systems.",
+    return svg(W, H, "Devansh Choubey. Mission: build intelligent machines that help. Origin: The Matrix. Believes every problem has a solution. Days: AI agents at QAD. Nights: Rust dev tools and offline-first remotes.",
                rain_css, body)
-
-
-# ---------------------------------------------------------------- impact
-IMPACT = [
-    ("35", "engineers led across", "AI pods at QAD"),
-    ("10+", "enterprise clients", "running my agents"),
-    ("$10M+", "revenue driven", "by AI agents"),
-    ("18", "person AI team", "built at Kavida"),
-]
-
-
-def impact():
-    W, H, CYCLE = 880, 150, 8
-    tile = (W - 40 - 3 * 16) / 4
-    css = [".pulse{animation:pulse 4s ease-in-out infinite}@keyframes pulse{50%{opacity:.75}}"]
-    tiles = []
-    for i, (num, l1, l2) in enumerate(IMPACT):
-        x = 20 + i * (tile + 16)
-        css.append(f".in{i}{{animation:in{i} {CYCLE}s ease-out infinite}}"
-                   f"@keyframes in{i}{{0%,{i*6}%{{opacity:0}}{i*6+10}%,100%{{opacity:1}}}}")
-        tiles.append(
-            f'<g class="in{i}"><rect x="{x:.0f}" y="20" width="{tile:.0f}" height="110" rx="6" fill="{BG}" stroke="{G3}"/>'
-            f'<text x="{x+18:.0f}" y="72" class="m g pulse" font-size="38" font-weight="700" filter="url(#glow)">{esc(num)}</text>'
-            f'<text x="{x+18:.0f}" y="98" class="m g2" font-size="13">{esc(l1)}</text>'
-            f'<text x="{x+18:.0f}" y="116" class="m g2" font-size="13">{esc(l2)}</text></g>')
-    body = f"""<rect x="0.5" y="0.5" width="{W-1}" height="{H-1}" rx="10" fill="{BG}" stroke="{G3}"/>
-{"".join(tiles)}
-{overlays(W, H)}"""
-    return svg(W, H, "35 engineers led across AI pods at QAD. 10+ enterprise clients running my agents. $10M+ revenue driven by AI agents. 18-person AI team built at Kavida.",
-               "\n".join(css), body)
-
-
-# ---------------------------------------------------------------- career trace
-CAREER = [
-    # (label, sub, start, end, style, depth)
-    ("QAD", "Eng Manager & AI Architect", 2025.83, None, "now", 0),
-    ("Kavida", "acquired by QAD", 2021.42, 2025.83, "outline", 0),
-    ("Head of AI", "", 2022.92, 2025.83, "fill", 1),
-    ("Senior Data Scientist", "", 2021.92, 2022.92, "fill", 1),
-    ("Data Scientist", "", 2021.42, 2021.92, "fill", 1),
-    ("TCS", "Data Scientist", 2018.67, 2021.42, "outline", 0),
-]
-
-
-def career():
-    W, H = 880, 280
-    X0, X1, Y0 = 330, 840, 74
-    NOW, START = 2026.95, 2018.5
-    def xs(t):
-        return X0 + (X1 - X0) * (t - START) / (NOW - START)
-    css = [".bar{transform-box:fill-box;transform-origin:left center}",
-           ".grow{animation:grow 2.4s cubic-bezier(.2,.8,.2,1) both}@keyframes grow{from{transform:scaleX(0)}}",
-           ".head{animation:head 1.6s ease-in-out infinite}@keyframes head{50%{opacity:.25}}"]
-    out = [f'<text x="40" y="44" class="m w" font-size="14">$ git log --career --graph</text>']
-    for yr in range(2019, 2027):
-        x = xs(yr)
-        out.append(f'<text x="{x:.0f}" y="44" class="m g2" font-size="12" text-anchor="middle">{yr}</text>'
-                   f'<path d="M{x:.1f} 56 V{H-24}" stroke="{G3}" stroke-opacity=".5" stroke-dasharray="2 4"/>')
-    y = Y0 + 10
-    for label, sub, s, e, style, depth in CAREER:
-        x1, x2 = xs(s), xs(e if e else NOW)
-        lx = 40 + depth * 22
-        name_cls = "w" if depth == 0 else "g2"
-        out.append(f'<text x="{lx}" y="{y}" class="m {name_cls}" font-size="14" font-weight="{700 if depth == 0 else 400}">{esc(label)}</text>')
-        if sub:
-            out.append(f'<text x="{lx}" y="{y+16}" class="m g2" font-size="12">{esc(sub)}</text>')
-        if style == "outline":
-            out.append(f'<rect class="bar grow" x="{x1:.1f}" y="{y-10}" width="{x2-x1:.1f}" height="12" rx="6" fill="none" stroke="{G2}"/>')
-        elif style == "fill":
-            out.append(f'<rect class="bar grow" x="{x1:.1f}" y="{y-10}" width="{x2-x1:.1f}" height="12" rx="6" fill="{G3}" stroke="{G2}"/>')
-        else:  # current role
-            out.append(f'<rect class="bar grow" x="{x1:.1f}" y="{y-10}" width="{x2-x1:.1f}" height="12" rx="6" fill="{G}" filter="url(#glow)"/>'
-                       f'<circle class="head" cx="{x2:.1f}" cy="{y-4}" r="6" fill="{WHITE}" filter="url(#glow)"/>')
-        y += 34 if sub else 30
-    body = f"""{frame(W, H)}
-{"".join(out)}
-{overlays(W, H)}"""
-    return svg(W, H, "Career: TCS data scientist 2018 to 2021; Kavida 2021 to 2025, from data scientist to senior data scientist to Head of AI; QAD engineering manager and AI architect since November 2025 via the acquisition of Kavida.",
-               "\n".join(css), body)
 
 
 # ---------------------------------------------------------------- leaderboard
@@ -378,8 +371,7 @@ def main(argv):
     targets = {
         "hero": ("matrix-hero.svg", hero),
         "card": ("neofetch.svg", lambda: card(stats)),
-        "impact": ("impact.svg", impact),
-        "career": ("career.svg", career),
+        "origin": ("origin.svg", origin),
         "leaderboard": ("leaderboard.svg", lambda: leaderboard(board)),
         "pill": ("red-pill.svg", pill),
     }
