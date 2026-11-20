@@ -103,67 +103,92 @@ def overlays(w, h):
 
 
 # ---------------------------------------------------------------- hero
-def hero():
-    W, H, CYCLE, X = 880, 470, 16, 40
-    rain_css, rain_g = rain(W, H, seed=3, opacity=0.55)
+# An illustrative agent trace (the same one as on the resume), replayed as a
+# Matrix terminal: each span's bar grows over its real share of the 4.1 s run.
+TRACE = [
+    # (depth, name, start_ms, dur_ms, badge)
+    (0, "email.received", 0, 12, None),
+    (1, "classify_document", 12, 640, None),
+    (1, "extract.order_ack", 652, 2100, None),
+    (1, "po_updater.diff", 2752, 910, None),
+    (1, "schema_check", 3662, 38, "pass"),
+    (1, "eval.golden_set", 3700, 410, "pass"),
+    (0, "erp.sync", 4110, 0, "buyer approves"),
+]
+TRACE_MS = 4110
 
-    steps = {"s4": 25, "s5": 34, "s6": 76, "s7": 79, "s8": 83,
-             "s9": 86, "s10": 88, "s11": 90, "s12": 93}
+
+def hero():
+    W, H, CYCLE, X = 880, 480, 16, 40
+    rain_css, rain_g = rain(W, H, seed=3, opacity=0.5)
     css = [rain_css]
-    for cls, at in steps.items():
+
+    def appear(cls, at):
         css.append(f".{cls}{{animation:{cls} {CYCLE}s step-end infinite}}"
-                   f"@keyframes {cls}{{0%{{opacity:0}}{at}%{{opacity:1}}97%{{opacity:0}}}}")
-    for cls, (a, b) in {"t1": (2, 9), "t2": (12, 19), "t3": (22, 25)}.items():
+                   f"@keyframes {cls}{{0%{{opacity:0}}{at:.2f}%{{opacity:1}}97%{{opacity:0}}}}")
+
+    for cls, (a, b) in {"t1": (2, 9), "t2": (11, 17), "t3": (19, 24)}.items():
         css.append(f".{cls}{{transform-box:fill-box;transform-origin:left center;animation:{cls} {CYCLE}s steps(28,end) infinite}}"
                    f"@keyframes {cls}{{0%,{a}%{{transform:scaleX(0)}}{b}%,97%{{transform:scaleX(1)}}100%{{transform:scaleX(0)}}}}")
-    # shelllint takes 8% of the cycle, shellcheck 6.3x as long (50.4%)
     css.append(".bar{transform-box:fill-box;transform-origin:left center}"
-               f"#fast{{animation:fast {CYCLE}s linear infinite}}#slow{{animation:slow {CYCLE}s linear infinite}}"
-               "@keyframes fast{0%,26%{transform:scaleX(0)}34%,97%{transform:scaleX(1)}100%{transform:scaleX(0)}}"
-               "@keyframes slow{0%,26%{transform:scaleX(0)}76.4%,97%{transform:scaleX(1)}100%{transform:scaleX(0)}}"
                ".cur{animation:blink 1s step-end infinite}@keyframes blink{50%{opacity:0}}")
 
-    def typed(cls, y, text, size=24):
-        return (f'<mask id="m{cls}"><rect class="{cls}" x="{X-4}" y="{y-size}" width="800" height="{size+10}" fill="#fff"/></mask>'
-                f'<text x="{X}" y="{y}" class="m g" font-size="{size}" filter="url(#glow)" mask="url(#m{cls})">{esc(text)}</text>')
+    # trace replay window inside the cycle
+    T0, T1 = 30.0, 72.0
+    def pct(ms):
+        return T0 + (T1 - T0) * ms / TRACE_MS
 
-    def lint_row(cls, y, loc, code, sev, sevcls, msg):
-        # explicit x columns, so alignment never depends on whitespace handling
-        return (f'<g class="seq {cls} m" font-size="13.5">'
-                f'<text x="{X}" y="{y}" class="g3">{loc}</text>'
-                f'<text x="{X+110}" y="{y}" class="{sevcls}">{code} {sev}</text>'
-                f'<text x="{X+260}" y="{y}" class="g2">{esc(msg)}</text></g>')
+    appear("hdr", 26)
+    BX, BW = X + 330, 380          # waterfall area
+    rows, y = [], 214
+    for i, (depth, name, start, dur, badge) in enumerate(TRACE):
+        cls = f"row{i}"
+        a = pct(start)
+        b = max(pct(start + dur), a + 0.8)
+        appear(cls, a)
+        label = ("&#9492; " if depth else "") + esc(name)
+        bx = BX + BW * start / TRACE_MS
+        bw = max(3, BW * dur / TRACE_MS)
+        bar = ""
+        if dur:
+            css.append(f"#bar{i}{{animation:bar{i} {CYCLE}s linear infinite}}"
+                       f"@keyframes bar{i}{{0%,{a:.2f}%{{transform:scaleX(0)}}{b:.2f}%,97%{{transform:scaleX(1)}}100%{{transform:scaleX(0)}}}}")
+            bar = (f'<rect x="{BX}" y="{y-11}" width="{BW}" height="12" fill="{G}" fill-opacity="0.06"/>'
+                   f'<rect id="bar{i}" class="bar" x="{bx:.1f}" y="{y-11}" width="{bw:.1f}" height="12" fill="{G if name.startswith("extract") else G2}" filter="url(#glow)"/>')
+        timing = f"{dur / 1000:.1f}s" if dur >= 1000 else (f"{dur}ms" if dur else "&#8212;")
+        appear(f"done{i}", b)
+        badge_svg = ""
+        if badge:
+            color = G if badge == "pass" else "#ffb000"
+            bw2 = 8.6 * len(badge) + 12
+            badge_svg = (f'<g class="done{i}"><rect x="{X+190}" y="{y-12}" width="{bw2:.0f}" height="16" rx="3" fill="none" stroke="{color}"/>'
+                         f'<text x="{X+196}" y="{y}" font-size="12" fill="{color}">{esc(badge)}</text></g>')
+        rows.append(f'<g class="{cls}"><text x="{X + (14 if depth else 0)}" y="{y}" class="{"w" if depth == 0 else "g"}">{label}</text>{bar}'
+                    f'<text x="{BX + BW + 64}" y="{y}" class="g2 done{i}" text-anchor="end">{timing}</text></g>{badge_svg}')
+        y += 26
+    appear("total", T1)
+    appear("tag1", 76)
+    appear("tag2", 80)
 
     body = f"""{frame(W, H)}
 {rain_g}
-<rect x="24" y="24" width="{W-48}" height="{H-48}" rx="8" fill="{BG}" fill-opacity="0.45"/>
-{typed("t1", 72, "Wake up, Devansh...")}
-{typed("t2", 108, "The shell scripts have you.")}
-{typed("t3", 144, "Follow the fast linter.", 18)}
+<rect x="24" y="24" width="{W-48}" height="{H-48}" rx="8" fill="{BG}" fill-opacity="0.5"/>
+<mask id="mt1"><rect class="t1" x="{X-4}" y="48" width="800" height="34" fill="#fff"/></mask>
+<text x="{X}" y="72" class="m g" font-size="24" filter="url(#glow)" mask="url(#mt1)">Wake up, Devansh...</text>
+<mask id="mt2"><rect class="t2" x="{X-4}" y="84" width="800" height="34" fill="#fff"/></mask>
+<text x="{X}" y="108" class="m g" font-size="24" filter="url(#glow)" mask="url(#mt2)">The supply chain runs on email.</text>
+<mask id="mt3"><rect class="t3" x="{X-4}" y="124" width="800" height="28" fill="#fff"/></mask>
+<text x="{X}" y="144" class="m g" font-size="18" filter="url(#glow)" mask="url(#mt3)">Follow the agents.</text>
 <g class="m" font-size="14">
-  <text x="{X}" y="186" class="seq s4 g"><tspan class="w">$</tspan> lint-race --files 920</text>
-  <g class="seq s4">
-    <text x="{X}" y="220" class="g2">shellcheck</text>
-    <circle cx="{X+108}" cy="215" r="5" fill="{BLUE}"/><text x="{X+118}" y="220" class="g3" font-size="12">blue pill</text>
-    <rect x="{X+200}" y="208" width="520" height="14" fill="none" stroke="{G3}"/>
-    <rect id="slow" class="bar" x="{X+200}" y="208" width="520" height="14" fill="{G3}"/>
-    <text x="{X}" y="248" class="g" font-weight="700">shelllint</text>
-    <circle cx="{X+108}" cy="243" r="5" fill="{RED}"/><text x="{X+118}" y="248" class="g2" font-size="12">red pill</text>
-    <rect x="{X+200}" y="236" width="520" height="14" fill="none" stroke="{G3}"/>
-    <rect id="fast" class="bar" x="{X+200}" y="236" width="520" height="14" fill="{G}" filter="url(#glow)"/>
-  </g>
-  <text x="{X+732}" y="249" class="seq s5 w">done</text>
-  <text x="{X+732}" y="221" class="seq s6 g3">done</text>
-  <text x="{X}" y="284" class="seq s7 g" filter="url(#glow)">&gt; 6.3x faster. Up to 20x less memory. Same SC codes.</text>
+  <g class="hdr"><text x="{X}" y="184" class="w">$ trace supplier_update <tspan class="g2" font-size="12">  # illustrative</tspan></text>
+  <path d="M{X} 196 H{W-X}" stroke="{G3}" stroke-dasharray="2 6"/></g>
+  {"".join(rows)}
+  <text x="{W-X}" y="184" class="total w" text-anchor="end">4.1s</text>
+  <text x="{X}" y="420" class="tag1 g" font-size="18" filter="url(#glow)">&gt; I build AI agents that do real operations work.</text>
+  <text x="{X}" y="448" class="tag2 g2" font-size="13">every step evaluated, traced and costed. in production for 10+ enterprise clients<tspan class="cur g"> &#9608;</tspan></text>
 </g>
-<path d="M{X} 308 H{W-X}" stroke="{G3}" stroke-dasharray="2 6"/>
-<text x="{X}" y="338" class="seq s8 m g" font-size="14"><tspan class="w">$</tspan> radolint Dockerfile</text>
-{lint_row("s9", 364, "Dockerfile:1", "DL3006", "warning", "g", "Always tag the version of an image explicitly")}
-{lint_row("s10", 386, "Dockerfile:2", "DL3008", "warning", "g", "Pin versions in apt get install")}
-{lint_row("s11", 408, "Dockerfile:2", "DL3015", "info", "g2", "Avoid additional packages: --no-install-recommends")}
-<text x="{X}" y="440" class="seq s12 m g3" font-size="13"><tspan class="w">$</tspan> drop-in for hadolint. one ~10 MB binary, shellcheck built in<tspan class="cur g"> &#9608;</tspan></text>
 {overlays(W, H)}"""
-    return svg(W, H, "Wake up, Devansh. shelllint races shellcheck over 920 shell files and finishes 6.3 times faster, then radolint lints a Dockerfile.",
+    return svg(W, H, "Wake up, Devansh. An illustrative agent trace: a supplier email is classified, the order acknowledgement extracted, the PO diffed, schema-checked and evaluated, then synced to the ERP after the buyer approves. I build AI agents that do real operations work.",
                "\n".join(css), body)
 
 
@@ -173,7 +198,7 @@ def fmt_int(n):
 
 
 def card(stats):
-    W, H = 880, 340
+    W, H = 880, 360
     rain_css, rain_g = rain(260, H, cols_step=20, seed=11, opacity=0.45, id_prefix="n")
     D = ["11110", "10001", "10001", "10001", "10001", "10001", "11110"]
     C = ["01111", "10000", "10000", "10000", "10000", "10000", "01111"]
@@ -181,43 +206,120 @@ def card(stats):
           for g, ox in ((D, 0), (C, 6))
           for y, row in enumerate(g)
           for x, c in enumerate(row) if c == "1"]
-    rel = stats.get("releases") or {}
-    latest = ", ".join(f"{name} {tag}" for name, tag in rel.items() if tag) or "-"
     rows = [
-        ("Role", "Head of AI @ Kavida.ai"),
-        ("Based", "Sagar, India"),
-        ("Ships", "Rust linters, offline-first apps"),
-        ("Langs", "Rust, TypeScript, Python"),
-        ("Editor", "LSP + VS Code ext (radolint)"),
+        ("Role", "AI Architect & Eng Manager @ QAD"),
+        ("Before", "Head of AI @ Kavida (acquired by QAD)"),
+        ("Based", "Hyderabad, India"),
+        ("Builds", "multi-agent platforms, document AI, evals"),
+        ("Agents", "A2A, MCP, LangGraph, LiteLLM, Temporal"),
+        ("Models", "OpenAI, Claude, Gemini, Bedrock"),
+        ("Stack", "Python, FastAPI, TypeScript, AWS, K8s"),
         None,
         ("Repos", fmt_int(stats.get("public_repos"))),
-        ("Stars", fmt_int(stats.get("stars"))),
         ("Contribs", f"{fmt_int(stats.get('contributions'))} in the last year"),
-        ("Releases", latest),
     ]
-    kx, vx, y, lines = 320, 440, 84, []
+    kx, vx, y, lines = 320, 430, 84, []
     for r in rows:
         if r is None:
-            lines.append(f'<text x="{kx}" y="{y}" class="g3">-- github {"-" * 38}</text>')
+            lines.append(f'<text x="{kx}" y="{y}" class="g3">-- github {"-" * 40}</text>')
         else:
             lines.append(f'<text x="{kx}" y="{y}" class="g" font-weight="700">{esc(r[0])}</text>'
                          f'<text x="{vx}" y="{y}" class="g2">{esc(r[1])}</text>')
-        y += 22
-    updated = esc(stats.get("updated", ""))
+        y += 23
     body = f"""{frame(W, H)}
 <clipPath id="lc"><rect x="1" y="1" width="280" height="{H-2}" rx="10"/></clipPath>
 <g clip-path="url(#lc)">{rain_g}</g>
-<rect x="56" y="88" width="190" height="140" fill="{BG}" fill-opacity="0.7"/>
-<g transform="translate(64 98)" fill="{G}" filter="url(#glow)">{"".join(px)}</g>
+<rect x="56" y="98" width="190" height="140" fill="{BG}" fill-opacity="0.7"/>
+<g transform="translate(64 108)" fill="{G}" filter="url(#glow)">{"".join(px)}</g>
 <path d="M280 20 V{H-20}" stroke="{G3}"/>
 <g class="m" font-size="14">
   <text x="{kx}" y="44" class="w">devansh@mainframe:~$ <tspan class="g">neofetch</tspan></text>
-  <text x="{kx}" y="64" class="g3">{"-" * 48}</text>
+  <text x="{kx}" y="64" class="g3">{"-" * 50}</text>
   {"".join(lines)}
-  <text x="{kx}" y="{H-18}" class="g3" font-size="12">refreshed daily{(" · " + updated) if updated else ""}</text>
+  <text x="{kx}" y="{H-16}" class="g3" font-size="12">github stats refreshed daily</text>
 </g>
 {overlays(W, H)}"""
-    return svg(W, H, "Devansh Choubey: Head of AI at Kavida.ai. Rust linters and offline-first apps.", rain_css, body)
+    return svg(W, H, "Devansh Choubey: AI Architect and Engineering Manager at QAD, previously Head of AI at Kavida. Based in Hyderabad. Builds multi-agent platforms, document AI and evaluation systems.",
+               rain_css, body)
+
+
+# ---------------------------------------------------------------- impact
+IMPACT = [
+    ("35", "engineers led across", "AI pods at QAD"),
+    ("10+", "enterprise clients", "running my agents"),
+    ("$10M+", "revenue driven", "by AI agents"),
+    ("18", "person AI team", "built at Kavida"),
+]
+
+
+def impact():
+    W, H, CYCLE = 880, 150, 8
+    tile = (W - 40 - 3 * 16) / 4
+    css = [".pulse{animation:pulse 4s ease-in-out infinite}@keyframes pulse{50%{opacity:.75}}"]
+    tiles = []
+    for i, (num, l1, l2) in enumerate(IMPACT):
+        x = 20 + i * (tile + 16)
+        css.append(f".in{i}{{animation:in{i} {CYCLE}s ease-out infinite}}"
+                   f"@keyframes in{i}{{0%,{i*6}%{{opacity:0}}{i*6+10}%,100%{{opacity:1}}}}")
+        tiles.append(
+            f'<g class="in{i}"><rect x="{x:.0f}" y="20" width="{tile:.0f}" height="110" rx="6" fill="{BG}" stroke="{G3}"/>'
+            f'<text x="{x+18:.0f}" y="72" class="m g pulse" font-size="38" font-weight="700" filter="url(#glow)">{esc(num)}</text>'
+            f'<text x="{x+18:.0f}" y="98" class="m g2" font-size="13">{esc(l1)}</text>'
+            f'<text x="{x+18:.0f}" y="116" class="m g2" font-size="13">{esc(l2)}</text></g>')
+    body = f"""<rect x="0.5" y="0.5" width="{W-1}" height="{H-1}" rx="10" fill="{BG}" stroke="{G3}"/>
+{"".join(tiles)}
+{overlays(W, H)}"""
+    return svg(W, H, "35 engineers led across AI pods at QAD. 10+ enterprise clients running my agents. $10M+ revenue driven by AI agents. 18-person AI team built at Kavida.",
+               "\n".join(css), body)
+
+
+# ---------------------------------------------------------------- career trace
+CAREER = [
+    # (label, sub, start, end, style, depth)
+    ("QAD", "Eng Manager & AI Architect", 2025.83, None, "now", 0),
+    ("Kavida", "acquired by QAD", 2021.42, 2025.83, "outline", 0),
+    ("Head of AI", "", 2022.92, 2025.83, "fill", 1),
+    ("Senior Data Scientist", "", 2021.92, 2022.92, "fill", 1),
+    ("Data Scientist", "", 2021.42, 2021.92, "fill", 1),
+    ("TCS", "Data Scientist", 2018.67, 2021.42, "outline", 0),
+]
+
+
+def career():
+    W, H = 880, 280
+    X0, X1, Y0 = 330, 840, 74
+    NOW, START = 2026.95, 2018.5
+    def xs(t):
+        return X0 + (X1 - X0) * (t - START) / (NOW - START)
+    css = [".bar{transform-box:fill-box;transform-origin:left center}",
+           ".grow{animation:grow 2.4s cubic-bezier(.2,.8,.2,1) both}@keyframes grow{from{transform:scaleX(0)}}",
+           ".head{animation:head 1.6s ease-in-out infinite}@keyframes head{50%{opacity:.25}}"]
+    out = [f'<text x="40" y="44" class="m w" font-size="14">$ git log --career --graph</text>']
+    for yr in range(2019, 2027):
+        x = xs(yr)
+        out.append(f'<text x="{x:.0f}" y="44" class="m g2" font-size="12" text-anchor="middle">{yr}</text>'
+                   f'<path d="M{x:.1f} 56 V{H-24}" stroke="{G3}" stroke-opacity=".5" stroke-dasharray="2 4"/>')
+    y = Y0 + 10
+    for label, sub, s, e, style, depth in CAREER:
+        x1, x2 = xs(s), xs(e if e else NOW)
+        lx = 40 + depth * 22
+        name_cls = "w" if depth == 0 else "g2"
+        out.append(f'<text x="{lx}" y="{y}" class="m {name_cls}" font-size="14" font-weight="{700 if depth == 0 else 400}">{esc(label)}</text>')
+        if sub:
+            out.append(f'<text x="{lx}" y="{y+16}" class="m g2" font-size="12">{esc(sub)}</text>')
+        if style == "outline":
+            out.append(f'<rect class="bar grow" x="{x1:.1f}" y="{y-10}" width="{x2-x1:.1f}" height="12" rx="6" fill="none" stroke="{G2}"/>')
+        elif style == "fill":
+            out.append(f'<rect class="bar grow" x="{x1:.1f}" y="{y-10}" width="{x2-x1:.1f}" height="12" rx="6" fill="{G3}" stroke="{G2}"/>')
+        else:  # current role
+            out.append(f'<rect class="bar grow" x="{x1:.1f}" y="{y-10}" width="{x2-x1:.1f}" height="12" rx="6" fill="{G}" filter="url(#glow)"/>'
+                       f'<circle class="head" cx="{x2:.1f}" cy="{y-4}" r="6" fill="{WHITE}" filter="url(#glow)"/>')
+        y += 34 if sub else 30
+    body = f"""{frame(W, H)}
+{"".join(out)}
+{overlays(W, H)}"""
+    return svg(W, H, "Career: TCS data scientist 2018 to 2021; Kavida 2021 to 2025, from data scientist to senior data scientist to Head of AI; QAD engineering manager and AI architect since November 2025 via the acquisition of Kavida.",
+               "\n".join(css), body)
 
 
 # ---------------------------------------------------------------- leaderboard
@@ -276,6 +378,8 @@ def main(argv):
     targets = {
         "hero": ("matrix-hero.svg", hero),
         "card": ("neofetch.svg", lambda: card(stats)),
+        "impact": ("impact.svg", impact),
+        "career": ("career.svg", career),
         "leaderboard": ("leaderboard.svg", lambda: leaderboard(board)),
         "pill": ("red-pill.svg", pill),
     }

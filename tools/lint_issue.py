@@ -96,7 +96,7 @@ def render_comment(findings):
     if not findings:
         return ("### > 0 anomalies detected\n\n"
                 "radolint found nothing to fix. This Dockerfile is clean. Welcome to the real world.\n\n"
-                + footer())
+                + footer(counted=True))
 
     if any(f.get("code") == PARSE_ERROR for f in findings):
         msg = next(f for f in findings if f.get("code") == PARSE_ERROR)
@@ -122,15 +122,16 @@ def render_comment(findings):
     return (f"### > {n} {'anomaly' if n == 1 else 'anomalies'} detected ({summary})\n\n"
             + fence("\n".join(rows)) + "\n\n"
             + (f"Rule docs: {links}\n\n" if links else "")
-            + footer())
+            + footer(counted=True))
 
 
-def footer():
+def footer(counted=False):
     return ("---\n"
             "Linted by [radolint](https://github.com/DevanshChoubey/radolint), a Rust drop-in for hadolint. "
             "It only parsed your file; nothing was run. To check every pull request, add it to CI:\n\n"
             f"```yaml\n- uses: {ACTION_REF}\n  with:\n    dockerfile: Dockerfile\n```\n\n"
-            "_This issue closes itself. Your findings now count toward the leaderboard on the profile._")
+            "_This issue closes itself."
+            + (" Your findings now count toward the leaderboard on the profile._" if counted else "_"))
 
 
 def board_codes(findings):
@@ -167,6 +168,12 @@ def cmd_lint(args):
             result = {"counted": True, "codes": codes}
     except Rejected as e:
         comment = f"### > the construct rejected this request\n\n{e}\n\n{footer()}"
+    except (subprocess.TimeoutExpired, RuntimeError, ValueError, OSError) as e:
+        print(f"radolint failed: {e}", file=sys.stderr)
+        comment = ("### > glitch in the matrix\n\n"
+                   "radolint could not finish on this file. The owner has been notified by the failed run.\n\n"
+                   + footer())
+        result = {"counted": False, "codes": [], "error": True}
     (out / "comment.md").write_text(comment, encoding="utf-8")
     (out / "result.json").write_text(json.dumps(result) + "\n", encoding="utf-8")
     print(json.dumps(result))

@@ -128,6 +128,23 @@ class EndToEnd(unittest.TestCase):
         comment, result = self.run_lint("")
         self.assertFalse(result["counted"])
         self.assertIn("rejected", comment)
+        self.assertNotIn("leaderboard", comment)
+
+    def test_counted_reply_mentions_leaderboard(self):
+        comment, _ = self.run_lint(form("FROM ubuntu"))
+        self.assertIn("leaderboard", comment)
+
+
+class Failure(unittest.TestCase):
+    def test_broken_binary_still_replies(self):
+        with tempfile.TemporaryDirectory() as d:
+            ev = Path(d) / "event.json"
+            ev.write_text(json.dumps({"issue": {"body": form("FROM alpine:3.20")}}))
+            li.main(["lint", "--event", str(ev), "--radolint", "/nonexistent/radolint", "--out", d])
+            comment = (Path(d) / "comment.md").read_text()
+            result = json.loads((Path(d) / "result.json").read_text())
+        self.assertIn("glitch", comment)
+        self.assertFalse(result["counted"])
 
 
 if __name__ == "__main__":
