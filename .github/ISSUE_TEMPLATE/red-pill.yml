@@ -1,0 +1,20 @@
+name: "Take the red pill: lint a Dockerfile"
+description: Paste a Dockerfile and radolint replies with what it finds. It only parses the file; nothing is run.
+title: "radolint: lint my Dockerfile"
+labels: ["red-pill"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Paste **one Dockerfile** (up to 400 lines). A bot runs [radolint](https://github.com/DevanshChoubey/radolint) on it, comments the findings within about a minute and closes the issue.
+        Do not paste secrets: issues are public.
+  - type: textarea
+    id: dockerfile
+    attributes:
+      label: Dockerfile
+      render: dockerfile
+      placeholder: |
+        FROM ubuntu
+        RUN apt-get update && apt-get install curl
+    validations:
+      required: true

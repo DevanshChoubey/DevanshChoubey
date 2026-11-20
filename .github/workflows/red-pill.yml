@@ -1,0 +1,92 @@
+name: red pill (lint a Dockerfile)
+
+# Runs on issues from the "red pill" form. The issue body is untrusted:
+# it is never interpolated into a script, only read from the event file by
+# tools/lint_issue.py.
+on:
+  issues:
+    types: [opened]
+
+permissions: {}
+
+env:
+  RADOLINT_VERSION: v0.3.0
+  RADOLINT_SHA256: 57a99ca5ea8f4d5358091e524a128f03e966c29363117a0b35ac84b07a75da2d
+  DAILY_LIMIT: "3"
+
+jobs:
+  lint:
+    if: contains(github.event.issue.labels.*.name, 'red-pill')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write   # commit the leaderboard
+      issues: write     # comment, label, close
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rate limit per author
+        id: limit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --label red-pill \
+                --author "$AUTHOR" --search "created:>$since" --json number --jq length)
+          echo "count=$n" >> "$GITHUB_OUTPUT"
+
+      - name: Over the limit
+        if: steps.limit.outputs.count > fromJSON(env.DAILY_LIMIT)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+            --body "### > rate limit reached"$'\n\n'"The construct takes ${DAILY_LIMIT} Dockerfiles per person per day. Try again tomorrow, or run radolint locally: https://github.com/DevanshChoubey/radolint"
+          gh issue close "$ISSUE" --repo "$GITHUB_REPOSITORY" --reason "not planned"
+
+      - name: Install radolint (pinned, checksum-verified)
+        if: steps.limit.outputs.count <= fromJSON(env.DAILY_LIMIT)
+        run: |
+          f="radolint-${RADOLINT_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/DevanshChoubey/radolint/releases/download/${RADOLINT_VERSION}/$f"
+          echo "${RADOLINT_SHA256}  $RUNNER_TEMP/$f" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP"
+          echo "RADOLINT=$(find "$RUNNER_TEMP" -name radolint -type f -perm -u+x | head -1)" >> "$GITHUB_ENV"
+
+      - name: Lint
+        if: steps.limit.outputs.count <= fromJSON(env.DAILY_LIMIT)
+        run: python3 tools/lint_issue.py lint --event "$GITHUB_EVENT_PATH" --radolint "$RADOLINT" --out "$RUNNER_TEMP/out"
+
+      - name: Reply and close
+        if: steps.limit.outputs.count <= fromJSON(env.DAILY_LIMIT)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/out/comment.md"
+          gh issue close "$ISSUE" --repo "$GITHUB_REPOSITORY" --reason completed
+
+      - name: Update leaderboard
+        if: steps.limit.outputs.count <= fromJSON(env.DAILY_LIMIT)
+        run: |
+          if ! grep -q '"counted": true' "$RUNNER_TEMP/out/result.json"; then
+            echo "Nothing to count."; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Several issues can land at once: start from the latest main, apply
+          # this one result, push; on a race, reset and try again.
+          for attempt in 1 2 3 4 5; do
+            git fetch --quiet origin main
+            git reset --quiet --hard origin/main
+            python3 tools/lint_issue.py apply "$RUNNER_TEMP/out/result.json"
+            python3 tools/gen_svgs.py leaderboard
+            git add data/leaderboard.json assets/leaderboard.svg
+            git diff --cached --quiet && exit 0
+            git commit --quiet -m "leaderboard: issue #${{ github.event.issue.number }}"
+            git push --quiet origin HEAD:main && exit 0
+            sleep $((attempt * 3))
+          done
+          echo "Could not push the leaderboard after 5 attempts" >&2; exit 1

@@ -1,0 +1,43 @@
+name: refresh profile card
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # daily, 08:47 IST
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: card
+  cancel-in-progress: false
+
+jobs:
+  card:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refresh stats and card
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Optional: a fine-grained read-only token of the profile owner, so
+          # private contributions are included in the count.
+          PROFILE_STATS_TOKEN: ${{ secrets.PROFILE_STATS_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3 4 5; do
+            git fetch --quiet origin main
+            git reset --quiet --hard origin/main
+            python3 tools/fetch_stats.py
+            python3 tools/gen_svgs.py card
+            git add data/stats.json assets/neofetch.svg
+            git diff --cached --quiet && { echo "No changes."; exit 0; }
+            git commit --quiet -m "card: refresh stats"
+            git push --quiet origin HEAD:main && exit 0
+            sleep $((attempt * 3))
+          done
+          echo "Could not push after 5 attempts" >&2; exit 1

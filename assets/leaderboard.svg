@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="150" viewBox="0 0 880 150" role="img" aria-label="No Dockerfiles scanned yet. Be the first.">
+<title>No Dockerfiles scanned yet. Be the first.</title>
+<defs>
+  <filter id="glow" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="2" fill="#000" fill-opacity="0.28"/></pattern>
+  <linearGradient id="vig" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000500" stop-opacity="0.9"/><stop offset="0.25" stop-color="#000500" stop-opacity="0"/><stop offset="0.8" stop-color="#000500" stop-opacity="0"/><stop offset="1" stop-color="#000500" stop-opacity="0.95"/></linearGradient>
+</defs>
+<style>
+  .m{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+  .g{fill:#00ff41}.g2{fill:#00b32c}.g3{fill:#0a5c1f}.w{fill:#d6ffe0}
+  
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}.seq{opacity:1!important}.bar{transform:scaleX(1)!important}}
+</style>
+<rect x="0.5" y="0.5" width="879" height="149" rx="10" fill="#000500" stroke="#0a5c1f"/>
+<g class="m" font-size="14">
+  <text x="40" y="44" class="w">$ grep -c anomalies /construct/*.Dockerfile</text>
+  <text x="40" y="84" class="g" font-size="18" filter="url(#glow)">0 Dockerfiles scanned. The construct is empty.</text>
+  <text x="40" y="116" class="g2">Be the first: take the red pill and paste a Dockerfile.</text>
+</g>
+<rect x="1" y="1" width="878" height="148" rx="10" fill="url(#vig)"/><rect x="1" y="1" width="878" height="148" rx="10" fill="url(#scan)"/>
+</svg>

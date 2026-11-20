@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  push:
+    paths: ["tools/**", "tests/**", ".github/workflows/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install radolint for end-to-end tests
+        run: |
+          f="radolint-v0.3.0-x86_64-unknown-linux-musl.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/DevanshChoubey/radolint/releases/download/v0.3.0/$f"
+          echo "57a99ca5ea8f4d5358091e524a128f03e966c29363117a0b35ac84b07a75da2d  $RUNNER_TEMP/$f" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP"
+          echo "RADOLINT=$(find "$RUNNER_TEMP" -name radolint -type f -perm -u+x | head -1)" >> "$GITHUB_ENV"
+      - run: python3 -m unittest discover -s tests -v
+      - name: SVGs regenerate without errors
+        run: python3 tools/gen_svgs.py && git diff --stat

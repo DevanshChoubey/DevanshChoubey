@@ -1,0 +1,6 @@
+mockup.html
+PROFILE_SETTINGS.md
+__pycache__/
+*.pyc
+/out/
+_preview.html
